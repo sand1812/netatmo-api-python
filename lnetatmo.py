@@ -15,6 +15,7 @@ import warnings
 if __name__ == "__main__": warnings.filterwarnings("ignore")                              # For installation test only
 
 from sys import version_info
+from sys import argv
 from os import getenv
 from os.path import expanduser, exists
 import platform
@@ -22,6 +23,7 @@ import json, time
 import imghdr
 import warnings
 import logging
+import requests
 
 # Just in case method could change
 PYTHON3 = (version_info.major > 2)
@@ -65,6 +67,7 @@ _GETEVENTSUNTIL_REQ    = _BASE_URL + "api/geteventsuntil"
 _HOME_STATUS           = _BASE_URL + "api/homestatus"                                     # Used for Home+ Control Devices 
 _GETHOMES_DATA         = _BASE_URL + "api/homesdata"                                      # New API
 _GETHOMECOACH          = _BASE_URL + "api/gethomecoachsdata"                              #
+_SETSTATE              = _BASE_URL + "api/setstate"
 
 #TODO# Undocumented (but would be very usefull) API : Access currently forbidden (403)
 
@@ -306,7 +309,8 @@ class HomeStatus:
         self.resp = resp
         self.rawData = resp['body']['home']
         if not self.rawData : raise NoHome("No home %s found" % home_id)
-        self.rooms = self.rawData['rooms']
+        if "rooms" in self.rawData : self.rooms = self.rawData['rooms']
+        else : self.rooms=[]
         self.modules = self.rawData['modules']
 
     def getRoomsId(self):
@@ -340,6 +344,42 @@ class HomeStatus:
         return None
 
 
+class SetState:
+    """ Set the state of a module
+    Args :
+        authData (clientAuth): Authentication information with a working access Token
+        homeid : Home id of the home who's module belongs to
+        bridgeid : Bridge ID to reach the module
+        moduleid : ID of the module
+        """
+
+    def __init__(self, authData, homeid, bridgeid, moduleid):
+        self.authData = authData
+        self.homeid = homeid
+        self.bridgeid = bridgeid
+        self.moduleid = moduleid
+        self.getAuthToken = authData.accessToken
+        
+
+    def setContactorMode(self,value) :
+        postParams = {"home":{ "id":self.homeid,
+                               "modules": [ {"id":self.moduleid,
+                                             "contactor_mode":value,
+                                             "bridge":self.bridgeid} ] }}
+
+        headers = {"Authorization":  "Bearer %s" % self.getAuthToken}
+        #print(headers)
+        #print(json.dumps(postParams, indent=4))
+
+        r = postRequest2("set_contactor_mode",_SETSTATE,self.getAuthToken,postParams)
+        #print(f"Response: %s" % r)
+
+
+        
+        
+        
+
+    
 class ThermostatData:
     """
     List the Thermostat and temperature modules
@@ -928,8 +968,10 @@ class HomesData:
                 #print (h.keys())
                 if h["name"] == home or h["id"] == home:
                    self.Homes_Data = h
-#        print (self.Homes_Data)
+        #print (self.Homes_Data)
         if not self.Homes_Data : raise NoDevice("No Devices available")
+        if "modules" in self.Homes_Data : self.modules = self.Homes_Data["modules"]
+        else : self.modules = []
 
 
 class HomeCoach:
@@ -1005,6 +1047,19 @@ def filter_home_data(rawData, home):
 def cameraCommand(cameraUrl, commande, parameters=None, timeout=3):
     url = cameraUrl + ( commande % parameters if parameters else commande)
     return postRequest("Camera", url, timeout=timeout)
+
+
+def postRequest2(topic,url,authToken,datas,timeout=10) :
+    headers = {"Authorization":  "Bearer %s" % authToken}
+    r = requests.post(url, headers=headers, json=datas)
+    if r.status_code == 200 :
+        return r.json()
+    if r.status_code == 403 :
+        logger.warning("Your current token scope do not allow access to %s" % topic)
+        return r.json()
+    logger.error("code=%s, reason=%s" % (r.status_code,r.json()))
+    return r.json()
+    
 
 def postRequest(topic, url, params=None, timeout=10):
     if PYTHON3:
@@ -1117,6 +1172,20 @@ if __name__ == "__main__":
 #        homesdata = lnetatmo.HomesData(authorization)
 # ERROR ; Your current token scope do not allow access to Module ?  - No Home ID given !
         homesdata = HomesData(authorization, homeid)
+        for i in homesdata.modules :
+            if "bridge" in i :
+                print("Found module '%s' with id %s and type %s via gateway %s" % (i["name"],i["id"],i["type"],i["bridge"]))
+            else :
+                print("Found module '%s' with id %s and type %s" % (i["name"],i["id"],i["type"]))
+        if "--test" in argv :
+            for i in homesdata.modules :            
+                if i["type"] == "NLPO" :
+                    resp = input("Do you want to test (activate/deactivate) the device %s ? (yes/no) " % i["name"])
+                    if resp == "yes" :
+                        setter = SetState(authorization,homeid=homeid,bridgeid=i["bridge"],moduleid=i["id"])
+                        setter.setContactorMode("temporary_on")
+                        time.sleep(2)
+                        setter.setContactorMode("off")
     except NoDevice:
         logger.warning("No HomesData avaible for testing")
             
@@ -1124,6 +1193,13 @@ if __name__ == "__main__":
         Homecoach = HomeCoach(authorization)
     except NoDevice:
         logger.warning("No HomeCoach avaible for testing")
+
+    try :
+        homestatus = HomeStatus(authorization,homeid)
+        #for i in homestatus.modules :
+        #    print("Found module %s with type %s" % (i["id"],i["type"]))
+    except :
+        logger.warning("Unable to get homestatus")
         
     # If we reach this line, all is OK
     logger.info("OK")
