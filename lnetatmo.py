@@ -368,13 +368,19 @@ class SetState:
                                              "bridge":self.bridgeid} ] }}
 
         headers = {"Authorization":  "Bearer %s" % self.getAuthToken}
-        #print(headers)
-        #print(json.dumps(postParams, indent=4))
-
         r = postRequest2("set_contactor_mode",_SETSTATE,self.getAuthToken,postParams)
-        #print(f"Response: %s" % r)
+        return r
 
 
+    def setOn(self,value) :
+        postParams = {"home":{ "id":self.homeid,
+                               "modules": [ {"id":self.moduleid,
+                                             "on":value,
+                                             "bridge":self.bridgeid} ] }}
+
+        headers = {"Authorization":  "Bearer %s" % self.getAuthToken}
+        r = postRequest2("set_contactor_mode",_SETSTATE,self.getAuthToken,postParams)
+        return r
         
         
         

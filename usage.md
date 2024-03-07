@@ -479,7 +479,33 @@ Methods :
     * Output : value
 
 
-#### 4-7 Utilities functions ####
+#### 4-7 SetState class ####
+
+
+Constructor
+
+```python
+    homeStatus = lnetatmo.HomeStatus( authorization, home_id, bridge_id, module_id )
+```
+
+Requires : 
+- an authorization object (ClientAuth instance)
+- home_id which can be found in https://dev.netatmo.com/apidocumentation/control by using "GET homesdata"
+- bridge_id which can be found in homesdata response
+- module_id which can be found in homesdata response
+
+Return : a SetState object. This object allow to change state of a Home+Control device : power on/power off, change brightness, set position of a roller shutter...
+
+Methods :
+
+  * **setContactorMode** : Set NLPO device (legrand/netatmo contactor) to off/auto/temporary_on
+    * Output : response from server
+
+  * **setOn** : Set NLP device to off/on
+    * Output : response from server
+
+
+#### 4-8 Utilities functions ####
 
 
   * **rawAPI** (authentication, APIkeyword, parameters) : Direct call an APIkeyword from Netatmo and return a dictionary with the raw response the APIkeywork is the path without the / before as specified in the documentation (eg. "gethomesdata" or "homestatus")
@@ -488,7 +514,7 @@ Methods :
   * **todayStamps**() : Return a couple of epoch time (start, end) for the current day
 
 
-#### 4-8 All-in-One function ####
+#### 4-9 All-in-One function ####
 
 
 If you just need the current temperature and humidity reported by a sensor with associated min and max values on the last 24 hours, you can get it all with only one call that handle all required steps including authentication :
